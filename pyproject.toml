@@ -1,0 +1,21 @@
+[project]
+name = "back-end-library"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Lucas",email = "lucasdeoliveira937@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard] (>=0.139.0,<0.140.0)",
+    "psycopg2-binary (>=2.9.12,<3.0.0)",
+    "sqlalchemy (>=2.0.51,<3.0.0)"
+]
+
+[tool.poetry]
+packages = [{include = "back_end_library", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
