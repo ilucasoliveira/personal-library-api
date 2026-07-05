@@ -2,7 +2,6 @@ import os
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import books, profile
-from fastapi.staticfiles import StaticFiles
 
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 
@@ -35,5 +34,3 @@ app.add_middleware(
 app.include_router(books.router, tags=["Books' Routes"])
 
 app.include_router(profile.router, tags=["Profile's Routes"])
-
-app.mount("/uploads", StaticFiles(directory="src/back_end_library/uploads"), name="uploads")
