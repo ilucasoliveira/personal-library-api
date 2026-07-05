@@ -19,8 +19,10 @@ This project started as a way to give my boyfriend Arthur ("Thur") his own space
 - **SQLAlchemy 2.0** — using the modern `Mapped`/`mapped_column` declarative style
 - **Pydantic v2** — request/response validation and serialization
 - **PostgreSQL** (hosted on Supabase) — relational data storage
+- **Supabase Storage** — persistent file storage for profile photo uploads
 - **HTTP Basic Auth** — endpoint protection
 - **Poetry** — dependency and environment management
+- **httpx** — outbound requests to Supabase Storage's REST API
 
 ---
 
@@ -30,9 +32,11 @@ This project started as a way to give my boyfriend Arthur ("Thur") his own space
 - Reading status tracking (`to read`, `reading`, `read`)
 - 5-star rating system and personal comments per book
 - Favorite marking
-- Profile endpoint with photo upload (multipart, served via static files)
+- Profile endpoint with photo upload, stored persistently via Supabase Storage
 - Integration-ready with an external book search (Google Books API) on the frontend
 - Environment-based configuration (no secrets committed to source control)
+- Configurable CORS via environment variable, supporting multiple deployed origins
+- Lightweight `/ping` health-check endpoint for uptime monitoring
 
 ---
 
@@ -41,14 +45,13 @@ This project started as a way to give my boyfriend Arthur ("Thur") his own space
 ```
 src/back_end_library/
 ├── main.py            # FastAPI app instance, middleware, router registration
-├── database.py         # SQLAlchemy engine/session setup
+├── database.py         # SQLAlchemy engine/session setup (NullPool for pooled connections)
 ├── models.py           # ORM models (Book, Profile)
 ├── schemas.py          # Pydantic schemas for validation/serialization
 ├── auth.py             # HTTP Basic Auth dependency
 ├── routers/
 │   ├── books.py         # Book CRUD endpoints
-│   └── profile.py       # Profile + photo upload endpoints
-└── uploads/             # Uploaded profile photos (gitignored)
+│   └── profile.py       # Profile + photo upload endpoints (Supabase Storage)
 ```
 
 ---
@@ -65,8 +68,9 @@ src/back_end_library/
 | GET    | `/profile`            | Get profile data                 |
 | PUT    | `/profile`            | Update profile data              |
 | POST   | `/profile/upload`     | Upload a profile photo           |
+| GET/HEAD | `/ping`              | Health check (used for uptime monitoring) |
 
-All endpoints require HTTP Basic Auth. Interactive docs available at `/docs` (Swagger UI) once running.
+All endpoints (except `/ping`) require HTTP Basic Auth. Interactive docs available at `/docs` (Swagger UI) once running.
 
 ---
 
@@ -84,7 +88,8 @@ poetry install
 
 # Set up environment variables
 cp .env.example .env
-# then fill in DATABASE_URL, MEU_USUARIO, MINHA_SENHA
+# then fill in DATABASE_URL, MEU_USUARIO, MINHA_SENHA, ALLOWED_ORIGINS,
+# SUPABASE_URL, SUPABASE_SERVICE_KEY
 
 # Create database tables
 poetry run python src/back_end_library/create_tables.py
@@ -95,9 +100,13 @@ poetry run fastapi dev src/back_end_library/main.py
 
 ---
 
-## 🌐 Live Demo
+## ☁️ Deployment
 
-> 🔧 Deployment in progress — link coming soon.
+This API runs in production on **[Render](https://render.com)** (free tier web service), connected to a **[Supabase](https://supabase.com)** PostgreSQL database and Supabase Storage for file uploads. Uptime is kept alive via a scheduled ping from **[UptimeRobot](https://uptimerobot.com)** hitting the `/ping` endpoint every 5 minutes.
+
+**Live API docs:** [personal-library-api-gnvq.onrender.com/docs](https://personal-library-api-gnvq.onrender.com/docs)
+
+> Note: interactive docs are public, but every endpoint requires valid credentials to return data — this API serves a private personal library.
 
 ---
 
