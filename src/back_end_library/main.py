@@ -16,6 +16,10 @@ app = FastAPI(
     }
 )
 
+@app.get("/ping")
+def ping():
+    return {"status": "ok"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
