@@ -5,6 +5,7 @@ from ..auth import user_authenticate
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Book
+from datetime import date
 
 router = APIRouter()
 
@@ -49,12 +50,16 @@ def update_book(id: int, update_book: UpdateSchemaBook, credentials: HTTPBasicCr
         book.grade = update_book.grade
     if update_book.comment is not None:
         book.comment = update_book.comment
-    if update_book.reading_status is not None:
-        book.reading_status = update_book.reading_status
     if update_book.favorite is not None:
         book.favorite = update_book.favorite
     if update_book.cover_url is not None:
         book.cover_url = update_book.cover_url
+    if update_book.reading_status is not None:
+        book.reading_status = update_book.reading_status
+        if book.reading_status == "read":
+            book.finished_date = date.today()
+        else:
+            book.finished_date = None
     
     db.commit()
     db.refresh(book)
