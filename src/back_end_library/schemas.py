@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
+from datetime import date
 
 class SchemaBook(BaseModel):
     title: str=Field(min_length=1, max_length=150, description="Título do livro")
@@ -14,6 +15,7 @@ class SchemaBook(BaseModel):
 
 class SchemaBookResponse(SchemaBook):
     id: int
+    finished_date: Optional[date] = None
 
 class UpdateSchemaBook(SchemaBook):
     title: Optional[str]=Field(default=None, min_length=1, max_length=150)
