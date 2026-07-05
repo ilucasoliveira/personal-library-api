@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import books, profile
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +19,10 @@ app = FastAPI(
 @app.get("/ping")
 def ping():
     return {"status": "ok"}
+
+@app.head("/ping")
+def ping_head():
+    return Response()
 
 app.add_middleware(
     CORSMiddleware,
