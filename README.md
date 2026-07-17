@@ -1,8 +1,8 @@
 # 📚 Personal Library API
 
-A REST API for managing a personal digital library — built as a gift for someone special.
+A REST API for managing a personal digital library. Track what you're reading, what you want to read next, and your ratings and notes on every book.
 
-This project started as a way to give my boyfriend Arthur ("Thur") his own space to track every book he reads: what he's currently reading, what he wants to read next, and his personal ratings and thoughts on each one. What began as a personal gift grew into a full-stack application with a production-ready backend, real deployment, and a design system built entirely from scratch.
+Started as a small side project and grew into a full-stack application with a production deployment, persistent file storage, and a design system built from scratch on the frontend side.
 
 ---
 
