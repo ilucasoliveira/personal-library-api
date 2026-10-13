@@ -1,6 +1,8 @@
-"""Prepara o banco da demo pública: cria as tabelas, zera os livros e insere os exemplos.
+"""Prepara a conta de visitante da demo: cria a conta (se faltar), zera os livros dela e insere os exemplos.
 
-Uso (com o .env apontando para o banco da DEMO, nunca para o banco pessoal):
+Só mexe nos livros do visitante: as contas das pessoas que se cadastraram ficam intactas.
+
+Uso (com DEMO_MODE=true e o DATABASE_URL da DEMO, depois de "alembic upgrade head"):
     poetry run python -m back_end_library.seed_demo
 
 As capas vêm do Google Books (use GOOGLE_BOOKS_KEY para não esbarrar na cota)
@@ -10,11 +12,13 @@ import os
 from datetime import date, timedelta
 
 import httpx
-from sqlalchemy import text
+from sqlalchemy import inspect
 
 from .config import DEMO_MODE
 from .database import SessionLocal, engine
-from .models import Base, Book, Profile
+from .models import Book, User
+
+VISITOR_EMAIL = "visitante@demo.invalid"
 
 TODAY = date.today()
 # opcional: com a chave, o Google Books não barra por cota
@@ -219,23 +223,33 @@ def find_cover(client: httpx.Client, title: str, author: str) -> str | None:
     return None
 
 
+def get_or_create_visitor(db) -> User:
+    visitor = db.query(User).filter(User.is_visitor.is_(True)).first()
+    if visitor is None:
+        # sem senha válida: só se entra pelo botão "Entrar como visitante" (/auth/visitor)
+        visitor = User(email=VISITOR_EMAIL, name="Visitante", password_hash="!", is_visitor=True)
+        db.add(visitor)
+        db.flush()
+    return visitor
+
+
 def seed():
-    # trava de segurança: o seed APAGA todos os livros, então só roda com DEMO_MODE=true
+    # trava de segurança: só roda no banco da demo
     if not DEMO_MODE:
         raise SystemExit(
-            "Abortado: o seed apaga todos os livros e só roda no banco da demo.\n"
-            "Defina DEMO_MODE=true no .env (e confira se o DATABASE_URL é o da demo)."
+            "Abortado: o seed só roda no banco da demo.\n"
+            "Defina DEMO_MODE=true (e confira se o DATABASE_URL é o da demo)."
         )
-
-    Base.metadata.create_all(engine)
+    if not inspect(engine).has_table("users"):
+        raise SystemExit("A tabela users não existe. Rode antes: poetry run alembic upgrade head")
 
     db = SessionLocal()
     try:
-        # recomeça do zero: apaga todos os livros (exemplos antigos e de visitantes)
-        db.execute(text("DELETE FROM livros"))
+        visitor = get_or_create_visitor(db)
 
-        if db.query(Profile).filter(Profile.id == 1).first() is None:
-            db.add(Profile(id=1, photo_url=None))
+        # recomeça a estante do visitante; livros de exemplo da demo antiga (sem dono) também saem
+        db.query(Book).filter(Book.user_id == visitor.id).delete(synchronize_session=False)
+        db.query(Book).filter(Book.user_id.is_(None), Book.is_example.is_(True)).delete(synchronize_session=False)
 
         headers = {"User-Agent": "MyOwnBookShelf-demo-seed/1.0"}
         with httpx.Client(timeout=10, headers=headers, follow_redirects=True) as client:
@@ -243,6 +257,7 @@ def seed():
                 cover = find_cover(client, example.get("cover_title", example["title"]), example["author"])
                 db.add(
                     Book(
+                        user_id=visitor.id,
                         title=example["title"],
                         author=example["author"],
                         gender=example["gender"],
@@ -260,7 +275,7 @@ def seed():
                 print(f"{'capa ok ' if cover else 'sem capa'}  {example['title']}")
 
         db.commit()
-        print(f"\nDemo pronta: {len(EXAMPLES)} livros de exemplo.")
+        print(f"\nDemo pronta: conta de visitante com {len(EXAMPLES)} livros de exemplo.")
     finally:
         db.close()
 

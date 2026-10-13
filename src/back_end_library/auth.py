@@ -1,21 +1,63 @@
-import os
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi import HTTPException, Depends
-from secrets import compare_digest
-from dotenv import load_dotenv
+"""Senhas (bcrypt) e login por token (JWT).
 
-load_dotenv()
+Fluxo: o usuário entra com email e senha em /auth/login e recebe um token.
+O front manda esse token no cabeçalho Authorization: Bearer <token> em toda requisição.
+"""
+from datetime import datetime, timedelta, timezone
 
-security = HTTPBasic()
+import bcrypt
+import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
 
-USERNAME = os.getenv("APP_USERNAME")
-PASSWORD = os.getenv("APP_PASSWORD")
+from .config import BCRYPT_ROUNDS, JWT_EXPIRE_DAYS, JWT_SECRET
+from .database import get_db
+from .models import User
 
-def user_authenticate(credentials: HTTPBasicCredentials=Depends(security)):
-    is_username_correct = compare_digest(credentials.username, USERNAME)
-    is_password_correct = compare_digest(credentials.password, PASSWORD)
-    
-    if not (is_username_correct and is_password_correct):
-        raise HTTPException(status_code=401, detail="Unauthorized credentials", headers={"WWW-Authenticate":"Basic"})
-    
-    return credentials
+ALGORITHM = "HS256"
+
+# tokenUrl faz o botão "Authorize" do /docs funcionar com email e senha
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+INVALID_TOKEN = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Invalid or expired session.",
+    headers={"WWW-Authenticate": "Bearer"},
+)
+
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(BCRYPT_ROUNDS)).decode("utf-8")
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+    except ValueError:
+        # hash inválido (ex.: a conta de visitante, que não tem senha)
+        return False
+
+
+# usado quando o email não existe: o login leva o mesmo tempo e não revela quais emails têm conta
+DUMMY_HASH = hash_password("not-a-real-password")
+
+
+def create_access_token(user_id: int) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {"sub": str(user_id), "iat": now, "exp": now + timedelta(days=JWT_EXPIRE_DAYS)}
+    return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)
+
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        user_id = int(payload["sub"])
+    except (jwt.PyJWTError, KeyError, ValueError):
+        raise INVALID_TOKEN
+
+    user = db.get(User, user_id)
+    if user is None:
+        # conta excluída depois que o token foi emitido
+        raise INVALID_TOKEN
+    return user

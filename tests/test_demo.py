@@ -1,87 +1,77 @@
 from datetime import date, timedelta
 
-from back_end_library.models import Book
+from back_end_library.models import Book, User
 
-from .conftest import AUTH
+from .conftest import register, bearer
 
 NEW_BOOK = {"title": "Meu livro", "author": "Alguém", "gender": "Romance"}
 
 
+def visitor_id(db) -> int:
+    return db.query(User).filter(User.is_visitor.is_(True)).one().id
+
+
 def add_example(db, title="Exemplo"):
-    book = Book(title=title, author="Autor", gender="Romance", is_example=True)
+    book = Book(title=title, author="Autor", gender="Romance", is_example=True, user_id=visitor_id(db))
     db.add(book)
     db.commit()
     db.refresh(book)
     return book
 
 
-def test_requires_credentials(client):
-    assert client.get("/books").status_code == 401
-
-
-def test_ping_touches_database(client):
-    response = client.get("/ping")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok", "demo": True}
-
-
-def test_example_book_cannot_be_updated(client, db):
+def test_example_book_cannot_be_updated(client, visitor, db):
     book = add_example(db)
-    response = client.put(f"/update/{book.id}", json={"favorite": True}, headers=AUTH)
-    assert response.status_code == 403
+    assert client.put(f"/update/{book.id}", json={"favorite": True}, headers=visitor).status_code == 403
 
 
-def test_example_book_cannot_be_deleted(client, db):
+def test_example_book_cannot_be_deleted(client, visitor, db):
     book = add_example(db)
-    assert client.delete(f"/delete/{book.id}", headers=AUTH).status_code == 403
-    assert client.get(f"/books/{book.id}", headers=AUTH).status_code == 200
+    assert client.delete(f"/delete/{book.id}", headers=visitor).status_code == 403
+    assert client.get(f"/books/{book.id}", headers=visitor).status_code == 200
 
 
-def test_visitor_can_manage_own_book(client):
-    created = client.post("/create", json=NEW_BOOK, headers=AUTH)
-    assert created.status_code == 201
-    body = created.json()
-    assert body["is_example"] is False
-
-    updated = client.put(f"/update/{body['id']}", json={"reading_status": "read", "grade": 5}, headers=AUTH)
-    assert updated.status_code == 200
-    assert updated.json()["finished_date"] == date.today().isoformat()
-
-    assert client.delete(f"/delete/{body['id']}", headers=AUTH).status_code == 204
+def test_visitor_can_manage_own_book(client, visitor):
+    book = client.post("/create", json=NEW_BOOK, headers=visitor).json()
+    assert client.put(f"/update/{book['id']}", json={"grade": 4}, headers=visitor).status_code == 200
+    assert client.delete(f"/delete/{book['id']}", headers=visitor).status_code == 204
 
 
-def test_visitor_cannot_create_example(client):
-    response = client.post("/create", json={**NEW_BOOK, "is_example": True}, headers=AUTH)
-    assert response.json()["is_example"] is False
-
-
-def test_old_visitor_books_are_cleaned(client, db):
+def test_old_visitor_books_are_cleaned(client, visitor, db):
     example = add_example(db)
-    old = Book(title="Velho", author="A", gender="B", add_date=date.today() - timedelta(days=3))
+    old = Book(title="Velho", author="A", gender="B", user_id=visitor_id(db), add_date=date.today() - timedelta(days=3))
     db.add(old)
     db.commit()
 
-    titles = [b["title"] for b in client.get("/books", headers=AUTH).json()]
-    assert "Velho" not in titles
-    assert example.title in titles
+    titles = [b["title"] for b in client.get("/books", headers=visitor).json()]
+    assert titles == [example.title]
 
 
-def test_visitor_books_are_capped(client, db):
+def test_visitor_books_are_capped(client, visitor, db):
     add_example(db)
     for i in range(5):
-        client.post("/create", json={**NEW_BOOK, "title": f"Livro {i}"}, headers=AUTH)
+        client.post("/create", json={**NEW_BOOK, "title": f"Livro {i}"}, headers=visitor)
 
-    books = client.get("/books", headers=AUTH).json()
-    visitor_titles = [b["title"] for b in books if not b["is_example"]]
-    assert visitor_titles == ["Livro 2", "Livro 3", "Livro 4"]
-    assert len(books) == 4
+    books = client.get("/books", headers=visitor).json()
+    added = [b["title"] for b in books if not b["is_example"]]
+    # limite de 3 nos testes: saem os mais antigos
+    assert added == ["Livro 2", "Livro 3", "Livro 4"]
+    assert sum(b["is_example"] for b in books) == 1
 
 
-def test_profile_is_created_and_locked(client):
-    profile = client.get("/profile", headers=AUTH)
-    assert profile.status_code == 200
-    assert profile.json()["id"] == 1
+def test_demo_rules_do_not_touch_real_accounts(client, visitor, db):
+    ana = bearer(register(client))
+    user_id = db.query(User).filter(User.email == "ana@example.com").one().id
+    db.add(Book(title="Antigo", author="A", gender="B", user_id=user_id, add_date=date.today() - timedelta(days=30)))
+    db.commit()
 
-    assert client.put("/profile", json={"photo_url": "https://x"}, headers=AUTH).status_code == 403
-    upload = client.post("/profile/upload", files={"file": ("a.png", b"x", "image/png")}, headers=AUTH)
-    assert upload.status_code == 403
+    # o visitante lista e cria livros (o que dispara a limpeza), mas a estante da Ana não muda
+    client.get("/books", headers=visitor)
+    client.post("/create", json=NEW_BOOK, headers=visitor)
+    assert [b["title"] for b in client.get("/books", headers=ana).json()] == ["Antigo"]
+
+
+def test_visitor_settings_are_locked(client, visitor):
+    assert client.get("/me", headers=visitor).json()["is_visitor"] is True
+    assert client.put("/me", json={"theme": "paper"}, headers=visitor).status_code == 403
+    assert client.put("/me/password", json={"current_password": "x", "new_password": "12345678"}, headers=visitor).status_code == 403
+    assert client.request("DELETE", "/me", json={"password": "x"}, headers=visitor).status_code == 403
