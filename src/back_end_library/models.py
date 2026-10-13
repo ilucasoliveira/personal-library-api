@@ -21,6 +21,7 @@ class Book(Base):
     favorite: Mapped[bool] = mapped_column(Boolean, default=False)
     add_date: Mapped[date] = mapped_column(Date, default=date.today)
     finished_date: Mapped[Optional[date]] = mapped_column(Date)
+    is_example: Mapped[bool] = mapped_column(Boolean, default=False)
 
 class Profile(Base):
     __tablename__="profile"

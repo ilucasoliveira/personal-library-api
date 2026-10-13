@@ -16,6 +16,7 @@ class SchemaBook(BaseModel):
 class SchemaBookResponse(SchemaBook):
     id: int
     finished_date: Optional[date] = None
+    is_example: bool = False
 
 class UpdateSchemaBook(SchemaBook):
     title: Optional[str]=Field(default=None, min_length=1, max_length=150)
