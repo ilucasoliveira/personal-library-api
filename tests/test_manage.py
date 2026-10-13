@@ -25,8 +25,10 @@ def test_create_user_claims_orphan_books(db, typed_password):
 
 
 def test_reset_password(client, typed_password):
-    register(client)
+    session = {"Authorization": f"Bearer {register(client)['access_token']}"}
     manage.reset_password("ANA@example.com")
+    # a sessão aberta antes do reset cai
+    assert client.get("/me", headers=session).status_code == 401
 
     old = client.post("/auth/login", data={"username": "ana@example.com", "password": PASSWORD})
     new = client.post("/auth/login", data={"username": "ana@example.com", "password": "nova-senha-123"})

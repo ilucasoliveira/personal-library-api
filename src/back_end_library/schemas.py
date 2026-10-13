@@ -4,6 +4,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 Theme = Literal["twilight", "paper", "sepia", "forest"]
+ReadingStatus = Literal["toRead", "reading", "read"]
 Language = Literal["pt", "en"]
 HEX_COLOR = r"^#[0-9a-fA-F]{6}$"
 
@@ -18,7 +19,7 @@ class SchemaBook(BaseModel):
     synopsis: Optional[str] = Field(default=None, max_length=2000, description="Descreva a sinopse do livro")
     grade: Optional[int] = Field(default=None, ge=1, le=5, description="Nota para o livro")
     comment: Optional[str] = Field(default=None, max_length=300, description="Comentário para o livro")
-    reading_status: Optional[str] = Field(default="toRead", description="Status de leitura: toRead, reading ou read")
+    reading_status: ReadingStatus = Field(default="toRead", description="Status de leitura: toRead, reading ou read")
     favorite: Optional[bool] = Field(default=False, description="Adiciona a lista de favoritos")
 
 
@@ -33,7 +34,7 @@ class UpdateSchemaBook(SchemaBook):
     cover_url: Optional[str] = Field(default=None, max_length=1000)
     author: Optional[str] = Field(default=None, min_length=1, max_length=100)
     gender: Optional[str] = Field(default=None, min_length=1, max_length=50)
-    reading_status: Optional[str] = Field(default=None, description="Status de leitura: toRead, reading ou read")
+    reading_status: Optional[ReadingStatus] = Field(default=None, description="Status de leitura: toRead, reading ou read")
     favorite: Optional[bool] = Field(default=None)
 
 

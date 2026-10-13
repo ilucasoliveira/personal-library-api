@@ -51,3 +51,11 @@ def test_orphan_books_are_invisible(client, auth, db):
     db.add(Book(title="Sem dono", author="A", gender="B"))
     db.commit()
     assert client.get("/books", headers=auth).json() == []
+
+
+def test_reading_status_is_validated(client, auth):
+    assert client.post("/create", json={**NEW_BOOK, "reading_status": "banana"}, headers=auth).status_code == 422
+    book = client.post("/create", json=NEW_BOOK, headers=auth).json()
+    assert book["reading_status"] == "toRead"
+    assert client.put(f"/update/{book['id']}", json={"reading_status": "banana"}, headers=auth).status_code == 422
+    assert client.put(f"/update/{book['id']}", json={"reading_status": "reading"}, headers=auth).json()["reading_status"] == "reading"

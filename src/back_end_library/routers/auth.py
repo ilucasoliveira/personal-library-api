@@ -13,7 +13,7 @@ router = APIRouter(prefix="/auth")
 
 
 def token_for(user: User) -> TokenResponse:
-    return TokenResponse(access_token=create_access_token(user.id), user=user)
+    return TokenResponse(access_token=create_access_token(user), user=user)
 
 
 @router.post("/register", status_code=201, response_model=TokenResponse)

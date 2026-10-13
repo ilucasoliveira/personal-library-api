@@ -35,9 +35,9 @@ Started as a small side project and grew into a full-stack application with a pr
 - **User accounts**: sign up and log in with email and password (bcrypt hashes, JWT bearer tokens)
 - **One shelf per account**: every book query is scoped to the logged-in user; someone else's book answers `404`
 - **Personal settings**: theme (`twilight`, `paper`, `sepia`, `forest`), accent color and language (`pt` / `en`) saved on the account
-- Change password and delete account (removes every book of the account)
+- Change password (every other session is logged out) and delete account (removes every book of the account)
 - Full CRUD for books: create, read, update, delete
-- Reading status tracking (`to read`, `reading`, `read`)
+- Reading status tracking: `toRead`, `reading` or `read` (anything else is rejected with `422`)
 - 5-star rating system and personal comments per book
 - Favorite marking
 - Profile photo upload per user, stored in Supabase Storage (JPG, PNG, WEBP or GIF, up to 2 MB)
@@ -84,7 +84,7 @@ tests/                  # pytest suite
 | POST   | `/auth/visitor`       | Log in to the shared visitor account (only with `DEMO_MODE=true`) |
 | GET    | `/me`                 | Current account                  |
 | PUT    | `/me`                 | Update name, theme, accent color or language |
-| PUT    | `/me/password`        | Change password                  |
+| PUT    | `/me/password`        | Change password; ends every other session and returns a new token |
 | POST   | `/me/photo`           | Upload a profile photo           |
 | DELETE | `/me`                 | Delete the account and all its books |
 | POST   | `/create`             | Add a new book                  |
@@ -120,7 +120,7 @@ poetry run alembic upgrade head
 poetry run python -m back_end_library.seed_demo
 ```
 
-Covers come from Google Books (set `GOOGLE_BOOKS_KEY` to avoid the anonymous quota) with Open Library as a fallback.
+The example covers are pinned Open Library cover IDs, picked by hand (Brazilian editions where available), so the seed needs no network. An example without a `cover_id` is looked up on Google Books (set `GOOGLE_BOOKS_KEY`) with Open Library as a fallback.
 
 ---
 

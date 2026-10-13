@@ -26,6 +26,8 @@ class User(Base):
     language: Mapped[str] = mapped_column(String(5), default="pt")
     # conta compartilhada da demo: livros de exemplo e configurações bloqueadas
     is_visitor: Mapped[bool] = mapped_column(Boolean, default=False)
+    # sobe a cada troca de senha: tokens emitidos antes deixam de valer
+    token_version: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

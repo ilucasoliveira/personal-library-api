@@ -6,10 +6,10 @@ import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_user, hash_password, verify_password
+from ..auth import create_access_token, get_current_user, hash_password, verify_password
 from ..database import get_db
 from ..models import Book, User
-from ..schemas import AccountDelete, PasswordChange, UserResponse, UserSettings
+from ..schemas import AccountDelete, PasswordChange, TokenResponse, UserResponse, UserSettings
 
 router = APIRouter(prefix="/me")
 
@@ -69,14 +69,18 @@ def update_me(data: UserSettings, user: User = Depends(get_current_user), db: Se
     return user
 
 
-@router.put("/password", status_code=204)
+@router.put("/password", response_model=TokenResponse)
 def change_password(data: PasswordChange, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Troca a senha, derruba todas as sessões abertas e devolve um token novo para esta."""
     block_visitor(user)
     if not verify_password(data.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail=WRONG_PASSWORD)
 
     user.password_hash = hash_password(data.new_password)
+    user.token_version = (user.token_version or 0) + 1
     db.commit()
+    db.refresh(user)
+    return TokenResponse(access_token=create_access_token(user), user=user)
 
 
 @router.post("/photo", response_model=UserResponse)

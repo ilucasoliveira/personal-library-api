@@ -43,9 +43,15 @@ def verify_password(password: str, password_hash: str) -> bool:
 DUMMY_HASH = hash_password("not-a-real-password")
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user: User) -> str:
     now = datetime.now(timezone.utc)
-    payload = {"sub": str(user_id), "iat": now, "exp": now + timedelta(days=JWT_EXPIRE_DAYS)}
+    payload = {
+        "sub": str(user.id),
+        # versão da senha: trocar a senha invalida os tokens antigos
+        "ver": user.token_version or 0,
+        "iat": now,
+        "exp": now + timedelta(days=JWT_EXPIRE_DAYS),
+    }
     return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)
 
 
@@ -53,11 +59,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
         user_id = int(payload["sub"])
-    except (jwt.PyJWTError, KeyError, ValueError):
+        version = int(payload.get("ver", 0))
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError):
         raise INVALID_TOKEN
 
     user = db.get(User, user_id)
-    if user is None:
-        # conta excluída depois que o token foi emitido
+    if user is None or version != (user.token_version or 0):
+        # conta excluída, ou senha trocada depois que o token foi emitido
         raise INVALID_TOKEN
     return user

@@ -5,8 +5,9 @@ Só mexe nos livros do visitante: as contas das pessoas que se cadastraram ficam
 Uso (com DEMO_MODE=true e o DATABASE_URL da DEMO, depois de "alembic upgrade head"):
     poetry run python -m back_end_library.seed_demo
 
-As capas vêm do Google Books (use GOOGLE_BOOKS_KEY para não esbarrar na cota)
-e, se ele falhar, da Open Library. Sem capa, o front mostra a capa colorida padrão.
+As capas dos exemplos são fixas (cover_id = id da capa na Open Library, escolhida à mão,
+de preferência numa edição brasileira). Um exemplo sem cover_id busca a capa no Google Books
+(use GOOGLE_BOOKS_KEY) e, se falhar, na Open Library.
 """
 import os
 from datetime import date, timedelta
@@ -33,6 +34,7 @@ def days_ago(n: int) -> date:
 EXAMPLES = [
     {
         "title": "Dom Casmurro",
+        "cover_id": 15156099,
         "author": "Machado de Assis",
         "gender": "Romance",
         "synopsis": "Bento Santiago revisita a própria vida para tentar entender o amor por Capitu e a desconfiança que tomou conta dele. Um narrador nada confiável conta a história do jeito que lhe convém.",
@@ -45,6 +47,7 @@ EXAMPLES = [
     },
     {
         "title": "O Hobbit",
+        "cover_id": 15027388,
         "author": "J.R.R. Tolkien",
         "gender": "Fantasia",
         "synopsis": "Bilbo Bolseiro só queria sossego na sua toca, mas um mago e treze anões o arrastam para uma viagem até uma montanha guardada por um dragão.",
@@ -57,6 +60,7 @@ EXAMPLES = [
     },
     {
         "title": "1984",
+        "cover_id": 8745958,
         "author": "George Orwell",
         "gender": "Distopia",
         "synopsis": "Num Estado que vigia cada gesto e reescreve o passado, Winston Smith começa a duvidar do Partido e arrisca tudo por um pouco de verdade.",
@@ -69,6 +73,7 @@ EXAMPLES = [
     },
     {
         "title": "O Pequeno Príncipe",
+        "cover_id": 15231561,
         "author": "Antoine de Saint-Exupéry",
         "gender": "Fábula",
         "synopsis": "Um aviador perdido no deserto conhece um pequeno príncipe vindo de outro planeta, que conta suas viagens e o que aprendeu sobre amizade e cuidado.",
@@ -81,6 +86,7 @@ EXAMPLES = [
     },
     {
         "title": "A Revolução dos Bichos",
+        "cover_id": 15200524,
         "author": "George Orwell",
         "gender": "Sátira",
         "synopsis": "Os animais de uma fazenda expulsam o dono e prometem igualdade para todos, até que alguns passam a ser mais iguais que os outros.",
@@ -93,6 +99,7 @@ EXAMPLES = [
     },
     {
         "title": "Memórias Póstumas de Brás Cubas",
+        "cover_id": 15156100,
         "author": "Machado de Assis",
         "gender": "Romance",
         "synopsis": "Um defunto autor decide contar a própria vida depois de morto, com ironia e sem pressa, rindo das vaidades da sociedade e das suas próprias.",
@@ -105,6 +112,7 @@ EXAMPLES = [
     },
     {
         "title": "Orgulho e Preconceito",
+        "cover_id": 14665299,
         "author": "Jane Austen",
         "gender": "Romance",
         "synopsis": "Elizabeth Bennet e o orgulhoso Sr. Darcy começam com o pé esquerdo e precisam rever as primeiras impressões que tiveram um do outro.",
@@ -117,6 +125,7 @@ EXAMPLES = [
     },
     {
         "title": "Duna",
+        "cover_id": 8200322,
         "author": "Frank Herbert",
         "gender": "Ficção científica",
         "synopsis": "No planeta desértico de Arrakis, fonte da especiaria mais valiosa do universo, o jovem Paul Atreides se vê no centro de uma disputa entre casas nobres.",
@@ -129,10 +138,9 @@ EXAMPLES = [
     },
     {
         "title": "Cem Anos de Solidão",
+        "cover_id": 13162734,
         "author": "Gabriel García Márquez",
         "gender": "Realismo mágico",
-        # em português nenhuma das APIs acha a capa; busca pelo título original
-        "cover_title": "Cien años de soledad",
         "synopsis": "A história de sete gerações da família Buendía na cidade de Macondo, onde o extraordinário acontece com a maior naturalidade.",
         "grade": None,
         "comment": None,
@@ -143,6 +151,7 @@ EXAMPLES = [
     },
     {
         "title": "Frankenstein",
+        "cover_id": 15228975,
         "author": "Mary Shelley",
         "gender": "Terror",
         "synopsis": "Victor Frankenstein dá vida a uma criatura e foge do que criou. Abandonada, ela parte em busca de respostas e de vingança.",
@@ -155,6 +164,7 @@ EXAMPLES = [
     },
     {
         "title": "A Hora da Estrela",
+        "cover_id": 14565305,
         "author": "Clarice Lispector",
         "gender": "Romance",
         "synopsis": "Um narrador tenta contar a vida de Macabéa, uma nordestina que vive no Rio de Janeiro quase sem perceber a si mesma.",
@@ -167,6 +177,7 @@ EXAMPLES = [
     },
     {
         "title": "Fahrenheit 451",
+        "cover_id": 8152009,
         "author": "Ray Bradbury",
         "gender": "Distopia",
         "synopsis": "Guy Montag é um bombeiro cujo trabalho é queimar livros, até que uma vizinha curiosa o faz perguntar o que existe dentro deles.",
@@ -254,7 +265,10 @@ def seed():
         headers = {"User-Agent": "MyOwnBookShelf-demo-seed/1.0"}
         with httpx.Client(timeout=10, headers=headers, follow_redirects=True) as client:
             for example in EXAMPLES:
-                cover = find_cover(client, example.get("cover_title", example["title"]), example["author"])
+                if example.get("cover_id"):
+                    cover = f"https://covers.openlibrary.org/b/id/{example['cover_id']}-L.jpg"
+                else:
+                    cover = find_cover(client, example["title"], example["author"])
                 db.add(
                     Book(
                         user_id=visitor.id,

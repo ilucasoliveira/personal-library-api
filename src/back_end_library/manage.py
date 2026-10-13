@@ -78,6 +78,8 @@ def reset_password(email: str):
         if user is None:
             sys.exit(f"Nenhuma conta com o email {email}.")
         user.password_hash = hash_password(read_password())
+        # derruba as sessões abertas com a senha antiga
+        user.token_version = (user.token_version or 0) + 1
         db.commit()
         print(f"Senha de {email} alterada.")
     finally:

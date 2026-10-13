@@ -25,9 +25,22 @@ def test_change_password(client, auth):
     assert wrong.status_code == 400
 
     ok = client.put("/me/password", json={"current_password": PASSWORD, "new_password": "nova-senha-123"}, headers=auth)
-    assert ok.status_code == 204
+    assert ok.status_code == 200
     login = client.post("/auth/login", data={"username": "ana@example.com", "password": "nova-senha-123"})
     assert login.status_code == 200
+
+
+def test_password_change_ends_other_sessions(client):
+    first = bearer(register(client))
+    second = bearer(client.post("/auth/login", data={"username": "ana@example.com", "password": PASSWORD}).json())
+
+    changed = client.put("/me/password", json={"current_password": PASSWORD, "new_password": "nova-senha-123"}, headers=first)
+    assert changed.status_code == 200
+
+    # os dois tokens antigos caem; o token devolvido pela troca continua valendo
+    assert client.get("/me", headers=first).status_code == 401
+    assert client.get("/me", headers=second).status_code == 401
+    assert client.get("/me", headers=bearer(changed.json())).status_code == 200
 
 
 def test_delete_account_removes_books(client, db):
