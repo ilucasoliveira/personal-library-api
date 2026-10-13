@@ -106,6 +106,8 @@ To reset the demo database to the sample books:
 poetry run python -m back_end_library.seed_demo
 ```
 
+Covers come from Google Books (set `GOOGLE_BOOKS_KEY` to avoid the anonymous quota) with Open Library as a fallback.
+
 ---
 
 ## 🚀 Running Locally

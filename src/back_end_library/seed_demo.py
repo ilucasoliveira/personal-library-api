@@ -3,9 +3,10 @@
 Uso (com o .env apontando para o banco da DEMO, nunca para o banco pessoal):
     poetry run python -m back_end_library.seed_demo
 
-As capas são buscadas na API pública do Google Books. Sem internet, os livros
-ficam sem capa e o front mostra a capa colorida padrão.
+As capas vêm do Google Books (use GOOGLE_BOOKS_KEY para não esbarrar na cota)
+e, se ele falhar, da Open Library. Sem capa, o front mostra a capa colorida padrão.
 """
+import os
 from datetime import date, timedelta
 
 import httpx
@@ -16,6 +17,8 @@ from .database import SessionLocal, engine
 from .models import Base, Book, Profile
 
 TODAY = date.today()
+# opcional: com a chave, o Google Books não barra por cota
+GOOGLE_BOOKS_KEY = os.getenv("GOOGLE_BOOKS_KEY")
 
 
 def days_ago(n: int) -> date:
@@ -124,6 +127,8 @@ EXAMPLES = [
         "title": "Cem Anos de Solidão",
         "author": "Gabriel García Márquez",
         "gender": "Realismo mágico",
+        # em português nenhuma das APIs acha a capa; busca pelo título original
+        "cover_title": "Cien años de soledad",
         "synopsis": "A história de sete gerações da família Buendía na cidade de Macondo, onde o extraordinário acontece com a maior naturalidade.",
         "grade": None,
         "comment": None,
@@ -171,21 +176,46 @@ EXAMPLES = [
 ]
 
 
+def google_books_cover(client: httpx.Client, title: str, author: str) -> str | None:
+    """Capa pelo Google Books. Sem chave, a cota anônima costuma estourar (erro 429)."""
+    params = {"q": f'intitle:"{title}" inauthor:"{author}"', "maxResults": 5, "printType": "books"}
+    if GOOGLE_BOOKS_KEY:
+        params["key"] = GOOGLE_BOOKS_KEY
+    response = client.get("https://www.googleapis.com/books/v1/volumes", params=params)
+    response.raise_for_status()
+    for item in response.json().get("items", []):
+        links = item.get("volumeInfo", {}).get("imageLinks", {})
+        url = links.get("thumbnail") or links.get("smallThumbnail")
+        if url:
+            return url.replace("http://", "https://").replace("&edge=curl", "")
+    return None
+
+
+def open_library_cover(client: httpx.Client, title: str, author: str) -> str | None:
+    """Capa pela Open Library (não precisa de chave)."""
+    response = client.get(
+        "https://openlibrary.org/search.json",
+        params={"title": title, "author": author, "limit": 5, "fields": "cover_i"},
+    )
+    response.raise_for_status()
+    for doc in response.json().get("docs", []):
+        if doc.get("cover_i"):
+            return f"https://covers.openlibrary.org/b/id/{doc['cover_i']}-L.jpg"
+    return None
+
+
 def find_cover(client: httpx.Client, title: str, author: str) -> str | None:
-    """Procura a capa no Google Books; devolve a URL em https ou None."""
-    try:
-        response = client.get(
-            "https://www.googleapis.com/books/v1/volumes",
-            params={"q": f"intitle:{title} inauthor:{author}", "maxResults": 5, "printType": "books"},
-        )
-        response.raise_for_status()
-        for item in response.json().get("items", []):
-            links = item.get("volumeInfo", {}).get("imageLinks", {})
-            url = links.get("thumbnail") or links.get("smallThumbnail")
+    """Tenta o Google Books e depois a Open Library; devolve a URL da capa ou None."""
+    for source, name in ((google_books_cover, "Google Books"), (open_library_cover, "Open Library")):
+        try:
+            url = source(client, title, author)
             if url:
-                return url.replace("http://", "https://").replace("&edge=curl", "")
-    except httpx.HTTPError:
-        pass
+                return url
+        except httpx.HTTPStatusError as err:
+            # mostra só o status, para não imprimir a URL com a chave
+            print(f"  aviso: {name} respondeu {err.response.status_code} para {title}")
+        except httpx.HTTPError as err:
+            print(f"  aviso: {name} falhou para {title} ({type(err).__name__})")
     return None
 
 
@@ -207,9 +237,10 @@ def seed():
         if db.query(Profile).filter(Profile.id == 1).first() is None:
             db.add(Profile(id=1, photo_url=None))
 
-        with httpx.Client(timeout=10) as client:
+        headers = {"User-Agent": "MyOwnBookShelf-demo-seed/1.0"}
+        with httpx.Client(timeout=10, headers=headers, follow_redirects=True) as client:
             for example in EXAMPLES:
-                cover = find_cover(client, example["title"], example["author"])
+                cover = find_cover(client, example.get("cover_title", example["title"]), example["author"])
                 db.add(
                     Book(
                         title=example["title"],

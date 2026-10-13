@@ -43,4 +43,9 @@ def db():
 
 def pytest_sessionfinish(session, exitstatus):
     engine.dispose()
-    os.unlink(_db_file.name)
+    # no Windows o SQLite pode segurar o arquivo por um instante; nesse caso ele fica
+    # na pasta temporária do sistema, que é limpa sozinha
+    try:
+        os.unlink(_db_file.name)
+    except OSError:
+        pass
