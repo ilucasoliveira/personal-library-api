@@ -46,7 +46,7 @@ Started as a small side project and grew into a full-stack application with a pr
 - Environment-based configuration (no secrets committed to source control)
 - Configurable CORS via environment variable, supporting multiple deployed origins
 - `/ping` health-check endpoint for uptime monitoring, which also touches the database so the free-tier database never goes idle
-- **Sign up switch** (`ALLOW_SIGNUP`): the public deployment accepts new accounts; a private deployment keeps it off
+- **Sign up switch** (`ALLOW_SIGNUP`): turn it off to run an invite-only instance, where accounts are created with `manage create-user`
 - **Visitor account** (`DEMO_MODE=true`): a shared account with read-only example books, automatic cleanup of the books visitors add and locked settings
 
 ---
@@ -163,13 +163,11 @@ poetry run pytest
 
 ## ☁️ Deployment
 
-This API runs in production on **[Render](https://render.com)** (free tier web service), connected to a **[Supabase](https://supabase.com)** PostgreSQL database and Supabase Storage for file uploads. Uptime is kept alive via a scheduled ping from **[UptimeRobot](https://uptimerobot.com)** hitting the `/ping` endpoint every 5 minutes.
+This API runs on **[Render](https://render.com)** (free tier web service), connected to a **[Supabase](https://supabase.com)** PostgreSQL database and Supabase Storage for profile photos. The `/ping` endpoint touches the database, so an uptime monitor (such as [UptimeRobot](https://uptimerobot.com)) can keep the free instance awake.
 
-**Live API docs:** [personal-library-api-gnvq.onrender.com/docs](https://personal-library-api-gnvq.onrender.com/docs)
+**Live API docs:** [bookshelf-demo-api.onrender.com/docs](https://bookshelf-demo-api.onrender.com/docs)
 
-> Note: the production instance serves a private personal library with sign up turned off; use the [live app](#-live-app) to try the API.
-
-**Upgrading a database from before accounts existed:** run `alembic upgrade head`, then create the owner's account with `manage create-user ... --claim-orphans`. Every book without an owner (and the old profile photo) goes to that account.
+**Upgrading a database from before accounts existed:** run `alembic upgrade head`, then create an account with `manage create-user ... --claim-orphans`. Every book without an owner (and the old profile photo) goes to that account.
 
 ---
 
