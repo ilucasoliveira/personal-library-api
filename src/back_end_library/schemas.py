@@ -25,6 +25,7 @@ class SchemaBook(BaseModel):
 
 class SchemaBookResponse(SchemaBook):
     id: int
+    add_date: Optional[date] = None
     finished_date: Optional[date] = None
     is_example: bool = False
 

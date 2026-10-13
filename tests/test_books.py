@@ -10,6 +10,7 @@ def test_user_manages_own_book(client, auth):
     assert created.status_code == 201
     book = created.json()
     assert book["is_example"] is False
+    assert book["add_date"] == date.today().isoformat()
 
     updated = client.put(f"/update/{book['id']}", json={"reading_status": "read", "grade": 5}, headers=auth)
     assert updated.status_code == 200
