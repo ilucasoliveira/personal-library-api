@@ -2,7 +2,7 @@
 
 A REST API for managing a personal digital library. Track what you're reading, what you want to read next, and your ratings and notes on every book.
 
-**Try the live demo:** see [Live demo](#-live-demo) below. Public credentials, sample books, and your own books to play with.
+**Try the live demo:** [my-own-bookshelf.vercel.app](https://my-own-bookshelf.vercel.app) (user `visitante`, password `biblioteca2026`). Details in [Live demo](#-live-demo) below.
 
 Started as a small side project and grew into a full-stack application with a production deployment, persistent file storage, and a design system built from scratch on the frontend side.
 
@@ -87,6 +87,9 @@ All endpoints (except `/ping`) require HTTP Basic Auth. Interactive docs availab
 ## 🎭 Live demo
 
 The demo runs this same code with `DEMO_MODE=true`, on its own database, so visitors never touch a real library.
+
+- **App:** [my-own-bookshelf.vercel.app](https://my-own-bookshelf.vercel.app)
+- **Demo API docs:** [bookshelf-demo-api.onrender.com/docs](https://bookshelf-demo-api.onrender.com/docs)
 
 | | |
 |---|---|
