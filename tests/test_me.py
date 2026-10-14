@@ -102,6 +102,64 @@ def test_photo_upload_replaces_old_photo(client, auth, monkeypatch):
     assert deleted == [first.replace("/object/public/", "/object/")]
 
 
+def fake_storage(monkeypatch, upload):
+    """Troca o cliente HTTP do Storage por um falso; upload(url) devolve a resposta ou levanta erro."""
+    from back_end_library.routers import me
+
+    monkeypatch.setattr(me, "SUPABASE_URL", "https://proj.supabase.co")
+    monkeypatch.setattr(me, "SUPABASE_SERVICE_KEY", "service-key")
+    deleted = []
+
+    class FakeAsyncClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, **kwargs):
+            return upload(url)
+
+    monkeypatch.setattr(me.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(me.httpx, "delete", lambda url, **k: deleted.append(url))
+    return me, deleted
+
+
+def test_photo_upload_failure_is_logged(client, auth, monkeypatch, caplog):
+    me, _ = fake_storage(monkeypatch, lambda url: me.httpx.Response(404, text='{"message":"Bucket not found"}'))
+    response = client.post("/me/photo", files={"file": ("a.jpg", b"jpg", "image/jpeg")}, headers=auth)
+    assert response.status_code == 502
+    assert response.json()["code"] == "photo_upload_failed"
+    assert "Bucket not found" in caplog.text
+    assert client.get("/me", headers=auth).json()["photo_url"] is None
+
+
+def test_photo_upload_storage_offline(client, auth, monkeypatch, caplog):
+    def offline(url):
+        raise me.httpx.ConnectError("nome não encontrado")
+
+    me, _ = fake_storage(monkeypatch, offline)
+    response = client.post("/me/photo", files={"file": ("a.jpg", b"jpg", "image/jpeg")}, headers=auth)
+    assert response.status_code == 502
+    assert "nome não encontrado" in caplog.text
+
+
+def test_delete_photo(client, auth, monkeypatch):
+    me, deleted = fake_storage(monkeypatch, lambda url: me.httpx.Response(200))
+    photo = client.post("/me/photo", files={"file": ("a.jpg", b"jpg", "image/jpeg")}, headers=auth).json()["photo_url"]
+    response = client.delete("/me/photo", headers=auth)
+    assert response.status_code == 200
+    assert response.json()["photo_url"] is None
+    assert deleted == [photo.replace("/object/public/", "/object/")]
+
+
+def test_visitor_cannot_delete_photo(client, visitor):
+    assert client.delete("/me/photo", headers=visitor).status_code == 403
+
+
 def test_me_shows_when_the_account_was_created(client, auth):
     body = client.get("/me", headers=auth).json()
     assert body["created_at"]

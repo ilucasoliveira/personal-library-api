@@ -1,4 +1,5 @@
 """A conta de quem está logado: dados, preferências (tema, cor, idioma), senha, foto e exclusão."""
+import logging
 import os
 import uuid
 
@@ -13,6 +14,7 @@ from ..models import Book, User
 from ..schemas import AccountDelete, PasswordChange, TokenResponse, UserResponse, UserSettings
 
 router = APIRouter(prefix="/me")
+logger = logging.getLogger(__name__)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
@@ -108,18 +110,38 @@ async def upload_photo(
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
         "Content-Type": file.content_type,
     }
-    async with httpx.AsyncClient(timeout=20) as client:
-        response = await client.post(
-            f"{SUPABASE_URL}/storage/v1/object/{BUCKET_NAME}/{file_name}", headers=headers, content=content
-        )
+    upload_failed = ApiError(502, "photo_upload_failed", "Could not upload the photo. Try again later.")
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                f"{SUPABASE_URL}/storage/v1/object/{BUCKET_NAME}/{file_name}", headers=headers, content=content
+            )
+    except httpx.HTTPError as exc:
+        # Storage fora do ar ou SUPABASE_URL apontando para um projeto que não existe
+        logger.warning("Storage inacessível ao enviar foto: %r", exc)
+        raise upload_failed from exc
 
     if response.status_code not in (200, 201):
-        raise ApiError(502, "photo_upload_failed", "Could not upload the photo. Try again later.")
+        # o motivo vai para o log do servidor (ex.: bucket inexistente, chave errada), não para o usuário
+        logger.warning("Storage recusou a foto: %s %s", response.status_code, response.text[:300])
+        raise upload_failed
 
     old_photo = user.photo_url
     user.photo_url = f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{file_name}"
     db.commit()
     remove_photo(old_photo)
+    db.refresh(user)
+    return user
+
+
+@router.delete("/photo", response_model=UserResponse)
+def delete_photo(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Tira a foto do perfil (volta para a inicial do nome) e apaga o arquivo do Storage."""
+    block_visitor(user)
+    photo = user.photo_url
+    user.photo_url = None
+    db.commit()
+    remove_photo(photo)
     db.refresh(user)
     return user
 

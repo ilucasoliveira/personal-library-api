@@ -87,6 +87,7 @@ tests/                  # pytest suite
 | PUT    | `/me`                 | Update name, theme, accent color or language |
 | PUT    | `/me/password`        | Change password; ends every other session and returns a new token |
 | POST   | `/me/photo`           | Upload a profile photo           |
+| DELETE | `/me/photo`           | Remove the profile photo (back to the initial) |
 | DELETE | `/me`                 | Delete the account and all its books |
 | POST   | `/books`              | Add a new book                  |
 | GET    | `/books`              | List your books                 |
