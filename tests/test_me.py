@@ -160,6 +160,37 @@ def test_visitor_cannot_delete_photo(client, visitor):
     assert client.delete("/me/photo", headers=visitor).status_code == 403
 
 
+def test_storage_headers_follow_the_key_type(monkeypatch):
+    from back_end_library.routers import me
+
+    # chave nova: não é JWT, vai só no apikey
+    monkeypatch.setattr(me, "SUPABASE_SERVICE_KEY", "sb_secret_abc123")
+    assert me.storage_headers() == {"apikey": "sb_secret_abc123"}
+    # chave antiga (service_role): é JWT, vai também no Authorization
+    monkeypatch.setattr(me, "SUPABASE_SERVICE_KEY", "eyJhbGciOiJIUzI1NiJ9.x.y")
+    assert me.storage_headers({"Content-Type": "image/jpeg"}) == {
+        "apikey": "eyJhbGciOiJIUzI1NiJ9.x.y",
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.x.y",
+        "Content-Type": "image/jpeg",
+    }
+
+
+def test_upload_with_new_secret_key_sends_no_bearer(client, auth, monkeypatch):
+    sent = []
+    me, _ = fake_storage(monkeypatch, lambda url: me.httpx.Response(200))
+    monkeypatch.setattr(me, "SUPABASE_SERVICE_KEY", "sb_secret_abc123")
+    upload = me.httpx.AsyncClient.post
+
+    async def recording_post(self, url, **kwargs):
+        sent.append(kwargs["headers"])
+        return await upload(self, url, **kwargs)
+
+    monkeypatch.setattr(me.httpx.AsyncClient, "post", recording_post)
+    response = client.post("/me/photo", files={"file": ("a.jpg", b"jpg", "image/jpeg")}, headers=auth)
+    assert response.status_code == 200
+    assert sent == [{"apikey": "sb_secret_abc123", "Content-Type": "image/jpeg"}]
+
+
 def test_me_shows_when_the_account_was_created(client, auth):
     body = client.get("/me", headers=auth).json()
     assert body["created_at"]

@@ -27,6 +27,19 @@ MAX_PHOTO_BYTES = 2 * 1024 * 1024
 PHOTO_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}
 
 
+def storage_headers(extra: dict | None = None) -> dict:
+    """Cabeçalhos para o Storage do Supabase.
+
+    A chave nova (sb_secret_...) não é um JWT: vai só no "apikey". Se ela for também em
+    "Authorization: Bearer", o Supabase tenta ler como JWT e recusa ("Invalid Compact JWS").
+    A chave antiga (service_role, um JWT que começa com "eyJ") vai nos dois, como antes.
+    """
+    headers = {"apikey": SUPABASE_SERVICE_KEY}
+    if SUPABASE_SERVICE_KEY and SUPABASE_SERVICE_KEY.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {SUPABASE_SERVICE_KEY}"
+    return {**headers, **(extra or {})}
+
+
 def remove_photo(photo_url: str | None):
     """Apaga do Storage uma foto enviada por aqui. Melhor esforço: se falhar, só fica um arquivo órfão."""
     prefix = f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/"
@@ -36,7 +49,7 @@ def remove_photo(photo_url: str | None):
     try:
         httpx.delete(
             f"{SUPABASE_URL}/storage/v1/object/{BUCKET_NAME}/{path}",
-            headers={"apikey": SUPABASE_SERVICE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"},
+            headers=storage_headers(),
             timeout=10,
         )
     except httpx.HTTPError:
@@ -105,11 +118,7 @@ async def upload_photo(
 
     # uma pasta por usuário no bucket
     file_name = f"user-{user.id}/{uuid.uuid4()}.{extension}"
-    headers = {
-        "apikey": SUPABASE_SERVICE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-        "Content-Type": file.content_type,
-    }
+    headers = storage_headers({"Content-Type": file.content_type})
     upload_failed = ApiError(502, "photo_upload_failed", "Could not upload the photo. Try again later.")
     try:
         async with httpx.AsyncClient(timeout=20) as client:
