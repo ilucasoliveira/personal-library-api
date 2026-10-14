@@ -1,0 +1,28 @@
+# Roda os testes da API a cada push e pull request na main.
+# Os testes usam SQLite temporário (tests/conftest.py): não precisa de banco nem de segredo.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Instala o pacote e o pytest
+        run: |
+          python -m pip install --upgrade pip
+          pip install . "pytest>=9.1.1,<10"
+
+      - name: Testes
+        run: pytest -q

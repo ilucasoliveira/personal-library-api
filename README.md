@@ -10,6 +10,7 @@ Started as a small side project and grew into a full-stack application with a pr
 
 ## 🛠 Tech Stack
 
+[![CI](https://github.com/ilucasoliveira/personal-library-api/actions/workflows/ci.yml/badge.svg)](https://github.com/ilucasoliveira/personal-library-api/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00?logo=sqlalchemy&logoColor=white)
@@ -26,7 +27,7 @@ Started as a small side project and grew into a full-stack application with a pr
 - **Poetry** — dependency and environment management
 - **httpx** — outbound requests to Supabase Storage's REST API
 - **Alembic** — database migrations
-- **pytest** — automated tests (auth, shelf isolation, account settings, visitor rules) against a temporary SQLite database
+- **pytest** — automated tests (auth, shelf isolation, account settings, visitor rules, error codes, partial updates) against a temporary SQLite database, run by GitHub Actions on every push (`.github/workflows/ci.yml`)
 
 ---
 
