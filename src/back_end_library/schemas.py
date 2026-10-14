@@ -17,7 +17,9 @@ class SchemaBook(BaseModel):
     author: str = Field(min_length=1, max_length=100, description="Nome do autor")
     gender: str = Field(min_length=1, max_length=50, description="Tipo de gênero")
     synopsis: Optional[str] = Field(default=None, max_length=2000, description="Descreva a sinopse do livro")
-    grade: Optional[int] = Field(default=None, ge=1, le=5, description="Nota para o livro")
+    grade: Optional[float] = Field(
+        default=None, ge=0.25, le=5, multiple_of=0.25, description="Nota de 0.25 a 5, de 0.25 em 0.25"
+    )
     comment: Optional[str] = Field(default=None, max_length=300, description="Comentário para o livro")
     reading_status: ReadingStatus = Field(default="toRead", description="Status de leitura: toRead, reading ou read")
     favorite: Optional[bool] = Field(default=False, description="Adiciona a lista de favoritos")

@@ -39,7 +39,7 @@ Started as a small side project and grew into a full-stack application with a pr
 - Change password (every other session is logged out) and delete account (removes every book of the account)
 - Full CRUD for books: create, read, update, delete
 - Reading status tracking: `toRead`, `reading` or `read` (anything else is rejected with `422`)
-- 5-star rating system and personal comments per book
+- Ratings from 0.25 to 5 stars in quarter steps, plus personal comments per book
 - Favorite marking
 - Profile photo upload per user, stored in Supabase Storage (JPG, PNG, WEBP or GIF, up to 2 MB)
 - Basic abuse protection: limits on failed logins per email, sign ups per IP and books per account

@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -44,7 +44,7 @@ class Book(Base):
     author: Mapped[str] = mapped_column(String(100))
     gender: Mapped[str] = mapped_column(String(50))
     synopsis: Mapped[Optional[str]] = mapped_column(String(2000))
-    grade: Mapped[Optional[int]] = mapped_column(Integer)
+    grade: Mapped[Optional[float]] = mapped_column(Float)
     comment: Mapped[Optional[str]] = mapped_column(String(300))
     reading_status: Mapped[str] = mapped_column(String(20), default="toRead")
     favorite: Mapped[bool] = mapped_column(Boolean, default=False)

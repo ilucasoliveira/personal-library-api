@@ -73,6 +73,18 @@ def test_rest_routes(client, auth):
     assert client.get(f"/books/{book_id}", headers=auth).status_code == 404
 
 
+def test_grade_in_quarter_steps(client, auth):
+    book = client.post("/books", json=NEW_BOOK, headers=auth).json()
+    for grade in (0.25, 2.5, 3.75, 5):
+        response = client.patch(f"/books/{book['id']}", json={"grade": grade}, headers=auth)
+        assert response.status_code == 200, grade
+        assert response.json()["grade"] == grade
+    # fora do passo de 0.25 ou fora de 0.25 a 5: recusa e a nota anterior fica
+    for grade in (0, 0.3, 3.8, 5.25, -1):
+        assert client.patch(f"/books/{book['id']}", json={"grade": grade}, headers=auth).status_code == 422, grade
+    assert client.get(f"/books/{book['id']}", headers=auth).json()["grade"] == 5
+
+
 def test_null_clears_optional_fields(client, auth):
     book = client.post("/books", json={**NEW_BOOK, "synopsis": "Uma história.", "cover_url": "https://x.com/c.jpg"}, headers=auth).json()
     filled = client.patch(f"/books/{book['id']}", json={"grade": 5, "comment": "Bom."}, headers=auth).json()
