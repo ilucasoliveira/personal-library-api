@@ -5,7 +5,9 @@ Não substitui um limitador distribuído, mas barra força bruta em senhas e cad
 import time
 from collections import defaultdict, deque
 
-from fastapi import HTTPException, Request
+from fastapi import Request
+
+from .errors import ApiError
 
 
 class RateLimiter:
@@ -23,7 +25,7 @@ class RateLimiter:
 
     def check(self, key: str):
         if len(self._prune(key)) >= self.max_hits:
-            raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
+            raise ApiError(429, "too_many_requests", "Too many attempts. Try again later.")
 
     def hit(self, key: str):
         self._prune(key).append(time.monotonic())

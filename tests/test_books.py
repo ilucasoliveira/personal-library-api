@@ -60,3 +60,39 @@ def test_reading_status_is_validated(client, auth):
     assert book["reading_status"] == "toRead"
     assert client.put(f"/update/{book['id']}", json={"reading_status": "banana"}, headers=auth).status_code == 422
     assert client.put(f"/update/{book['id']}", json={"reading_status": "reading"}, headers=auth).json()["reading_status"] == "reading"
+
+
+def test_rest_routes(client, auth):
+    created = client.post("/books", json=NEW_BOOK, headers=auth)
+    assert created.status_code == 201
+    book_id = created.json()["id"]
+
+    assert client.put(f"/books/{book_id}", json={"grade": 4}, headers=auth).json()["grade"] == 4
+    assert client.patch(f"/books/{book_id}", json={"favorite": True}, headers=auth).json()["favorite"] is True
+    assert client.delete(f"/books/{book_id}", headers=auth).status_code == 204
+    assert client.get(f"/books/{book_id}", headers=auth).status_code == 404
+
+
+def test_null_clears_optional_fields(client, auth):
+    book = client.post("/books", json={**NEW_BOOK, "synopsis": "Uma história.", "cover_url": "https://x.com/c.jpg"}, headers=auth).json()
+    filled = client.patch(f"/books/{book['id']}", json={"grade": 5, "comment": "Bom."}, headers=auth).json()
+    assert (filled["grade"], filled["comment"]) == (5, "Bom.")
+
+    cleared = client.patch(
+        f"/books/{book['id']}", json={"grade": None, "comment": None, "synopsis": None, "cover_url": "  "}, headers=auth
+    ).json()
+    assert (cleared["grade"], cleared["comment"], cleared["synopsis"], cleared["cover_url"]) == (None, None, None, None)
+    # campo que não veio no corpo não muda
+    assert cleared["title"] == NEW_BOOK["title"]
+
+    for field in ("title", "author", "gender", "reading_status", "favorite"):
+        response = client.patch(f"/books/{book['id']}", json={field: None}, headers=auth)
+        assert response.status_code == 422, field
+
+
+def test_errors_have_codes(client, auth):
+    assert client.get("/books/999999", headers=auth).json()["code"] == "book_not_found"
+    assert client.get("/books").json()["code"] == "invalid_session"
+    assert client.get("/nao-existe").json()["code"] == "not_found"
+    body = client.post("/books", json={"title": ""}, headers=auth).json()
+    assert body["code"] == "validation_error" and isinstance(body["detail"], list)

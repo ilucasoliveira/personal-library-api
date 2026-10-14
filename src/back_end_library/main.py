@@ -5,6 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from .config import ALLOW_SIGNUP, DEMO_MODE, JWT_SECRET
 from .database import get_db
+from .errors import install_error_handlers
 from .routers import auth, books, me
 
 # sem o segredo ninguém consegue entrar; melhor a API nem subir
@@ -54,6 +55,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+install_error_handlers(app)
 
 app.include_router(auth.router, tags=["Auth"])
 app.include_router(me.router, tags=["Account"])

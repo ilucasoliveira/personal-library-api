@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from ..auth import DUMMY_HASH, create_access_token, hash_password, verify_password
 from ..config import ALLOW_SIGNUP, DEMO_MODE
 from ..database import get_db
+from ..errors import ApiError
 from ..models import User
 from ..ratelimit import client_ip, failed_logins, signups
 from ..schemas import TokenResponse, UserCreate
@@ -20,14 +21,14 @@ def token_for(user: User) -> TokenResponse:
 def register(data: UserCreate, request: Request, db: Session = Depends(get_db)):
     """Cria uma conta e já devolve o token de login."""
     if not ALLOW_SIGNUP:
-        raise HTTPException(status_code=403, detail="Sign up is disabled.")
+        raise ApiError(403, "signup_disabled", "Sign up is disabled.")
 
     ip = client_ip(request)
     signups.check(ip)
 
     email = data.email.strip().lower()
     if db.query(User).filter(User.email == email).first():
-        raise HTTPException(status_code=409, detail="Email already registered.")
+        raise ApiError(409, "email_taken", "Email already registered.")
 
     user = User(
         email=email,
@@ -53,9 +54,10 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 
     if user is None or not password_ok or user.is_visitor:
         failed_logins.hit(email)
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect email or password.",
+        raise ApiError(
+            401,
+            "invalid_credentials",
+            "Incorrect email or password.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -67,9 +69,9 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 def visitor_login(db: Session = Depends(get_db)):
     """Entra na conta compartilhada de visitante (só no deploy da demo)."""
     if not DEMO_MODE:
-        raise HTTPException(status_code=404, detail="Not Found")
+        raise ApiError(404, "not_found", "Not Found")
 
     visitor = db.query(User).filter(User.is_visitor.is_(True)).first()
     if visitor is None:
-        raise HTTPException(status_code=503, detail="The demo account is not ready yet.")
+        raise ApiError(503, "demo_not_ready", "The demo account is not ready yet.")
     return token_for(visitor)

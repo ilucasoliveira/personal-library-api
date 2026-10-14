@@ -3,11 +3,12 @@ import os
 import uuid
 
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from ..auth import create_access_token, get_current_user, hash_password, verify_password
 from ..database import get_db
+from ..errors import ApiError
 from ..models import Book, User
 from ..schemas import AccountDelete, PasswordChange, TokenResponse, UserResponse, UserSettings
 
@@ -42,7 +43,7 @@ def remove_photo(photo_url: str | None):
 
 def block_visitor(user: User):
     if user.is_visitor:
-        raise HTTPException(status_code=403, detail=VISITOR_LOCKED)
+        raise ApiError(403, "visitor_locked", VISITOR_LOCKED)
 
 
 @router.get("", response_model=UserResponse)
@@ -59,7 +60,7 @@ def update_me(data: UserSettings, user: User = Depends(get_current_user), db: Se
         if field == "name":
             value = (value or "").strip()
             if not value:
-                raise HTTPException(status_code=422, detail="Name cannot be empty.")
+                raise ApiError(422, "name_required", "Name cannot be empty.")
         elif field in ("theme", "language") and value is None:
             continue
         setattr(user, field, value)
@@ -74,7 +75,7 @@ def change_password(data: PasswordChange, user: User = Depends(get_current_user)
     """Troca a senha, derruba todas as sessões abertas e devolve um token novo para esta."""
     block_visitor(user)
     if not verify_password(data.current_password, user.password_hash):
-        raise HTTPException(status_code=400, detail=WRONG_PASSWORD)
+        raise ApiError(400, "wrong_password", WRONG_PASSWORD)
 
     user.password_hash = hash_password(data.new_password)
     user.token_version = (user.token_version or 0) + 1
@@ -91,14 +92,14 @@ async def upload_photo(
 
     extension = PHOTO_TYPES.get(file.content_type or "")
     if extension is None:
-        raise HTTPException(status_code=415, detail="Photo must be JPG, PNG, WEBP or GIF.")
+        raise ApiError(415, "photo_type", "Photo must be JPG, PNG, WEBP or GIF.")
 
     content = await file.read(MAX_PHOTO_BYTES + 1)
     if len(content) > MAX_PHOTO_BYTES:
-        raise HTTPException(status_code=413, detail="Photo must be at most 2 MB.")
+        raise ApiError(413, "photo_size", "Photo must be at most 2 MB.")
 
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
-        raise HTTPException(status_code=503, detail="Photo upload is not configured.")
+        raise ApiError(503, "photo_unavailable", "Photo upload is not configured.")
 
     # uma pasta por usuário no bucket
     file_name = f"user-{user.id}/{uuid.uuid4()}.{extension}"
@@ -113,7 +114,7 @@ async def upload_photo(
         )
 
     if response.status_code not in (200, 201):
-        raise HTTPException(status_code=502, detail="Could not upload the photo. Try again later.")
+        raise ApiError(502, "photo_upload_failed", "Could not upload the photo. Try again later.")
 
     old_photo = user.photo_url
     user.photo_url = f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{file_name}"
@@ -128,7 +129,7 @@ def delete_me(data: AccountDelete, user: User = Depends(get_current_user), db: S
     """Apaga a conta e todos os livros dela. Pede a senha de novo para confirmar."""
     block_visitor(user)
     if not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=400, detail=WRONG_PASSWORD)
+        raise ApiError(400, "wrong_password", WRONG_PASSWORD)
 
     photo = user.photo_url
     db.query(Book).filter(Book.user_id == user.id).delete(synchronize_session=False)

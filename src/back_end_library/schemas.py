@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 Theme = Literal["twilight", "paper", "sepia", "forest"]
 ReadingStatus = Literal["toRead", "reading", "read"]
@@ -22,6 +22,14 @@ class SchemaBook(BaseModel):
     reading_status: ReadingStatus = Field(default="toRead", description="Status de leitura: toRead, reading ou read")
     favorite: Optional[bool] = Field(default=False, description="Adiciona a lista de favoritos")
 
+    @field_validator("cover_url", "synopsis", "comment", mode="before")
+    @classmethod
+    def blank_is_none(cls, value):
+        # texto vazio ou só espaços vale como "sem valor"
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
 
 class SchemaBookResponse(SchemaBook):
     id: int
@@ -37,6 +45,14 @@ class UpdateSchemaBook(SchemaBook):
     gender: Optional[str] = Field(default=None, min_length=1, max_length=50)
     reading_status: Optional[ReadingStatus] = Field(default=None, description="Status de leitura: toRead, reading ou read")
     favorite: Optional[bool] = Field(default=None)
+
+    @model_validator(mode="after")
+    def required_fields_not_null(self):
+        # estes campos podem ficar de fora do corpo, mas não podem ser apagados com null
+        for field in ("title", "author", "gender", "reading_status", "favorite"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        return self
 
 
 # ---------- usuários ----------

@@ -1,11 +1,12 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
 from ..config import DEMO_MAX_VISITOR_BOOKS, DEMO_MODE, DEMO_VISITOR_BOOK_DAYS, MAX_BOOKS_PER_USER
 from ..database import get_db
+from ..errors import ApiError
 from ..models import Book, User
 from ..schemas import SchemaBook, SchemaBookResponse, UpdateSchemaBook
 
@@ -45,18 +46,21 @@ def make_room_for_new_book(db: Session, user: User):
                 db.delete(old_book)
             db.commit()
     elif own_books(db, user).count() >= MAX_BOOKS_PER_USER:
-        raise HTTPException(status_code=409, detail=BOOK_LIMIT)
+        raise ApiError(409, "book_limit", BOOK_LIMIT)
 
 
 def get_book_or_404(id: int, db: Session, user: User) -> Book:
     # livro de outra pessoa responde 404, igual a um livro que não existe
     book = own_books(db, user).filter(Book.id == id).first()
     if book is None:
-        raise HTTPException(status_code=404, detail="Book not found.")
+        raise ApiError(404, "book_not_found", "Book not found.")
     return book
 
 
-@router.post("/create", status_code=201, response_model=SchemaBookResponse)
+# Rotas REST (/books e /books/{id}). As antigas (/create, /update/{id}, /delete/{id}) continuam
+# respondendo igual, marcadas como obsoletas na documentação, para não quebrar quem já usa.
+@router.post("/books", status_code=201, response_model=SchemaBookResponse)
+@router.post("/create", status_code=201, response_model=SchemaBookResponse, deprecated=True)
 def create_book(book: SchemaBook, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     clean_visitor_books(db, user)
     make_room_for_new_book(db, user)
@@ -81,49 +85,38 @@ def read_one_book(id: int, user: User = Depends(get_current_user), db: Session =
     return get_book_or_404(id, db, user)
 
 
-@router.put("/update/{id}", response_model=SchemaBookResponse)
+@router.patch("/books/{id}", response_model=SchemaBookResponse)
+@router.put("/books/{id}", response_model=SchemaBookResponse)
+@router.put("/update/{id}", response_model=SchemaBookResponse, deprecated=True)
 def update_book(
     id: int, update_book: UpdateSchemaBook, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
+    """Muda só os campos enviados. null apaga sinopse, nota, comentário ou capa;
+    título, autor, gênero, status e favorito não aceitam null (422)."""
     book = get_book_or_404(id, db, user)
 
     if book.is_example:
-        raise HTTPException(status_code=403, detail=EXAMPLE_LOCKED)
+        raise ApiError(403, "example_read_only", EXAMPLE_LOCKED)
 
-    if update_book.title is not None:
-        book.title = update_book.title
-    if update_book.author is not None:
-        book.author = update_book.author
-    if update_book.gender is not None:
-        book.gender = update_book.gender
-    if update_book.synopsis is not None:
-        book.synopsis = update_book.synopsis
-    if update_book.grade is not None:
-        book.grade = update_book.grade
-    if update_book.comment is not None:
-        book.comment = update_book.comment
-    if update_book.favorite is not None:
-        book.favorite = update_book.favorite
-    if update_book.cover_url is not None:
-        book.cover_url = update_book.cover_url
-    if update_book.reading_status is not None:
-        book.reading_status = update_book.reading_status
-        if book.reading_status == "read":
-            book.finished_date = date.today()
-        else:
-            book.finished_date = None
+    changes = update_book.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        if field == "reading_status" and value != book.reading_status:
+            # a data de leitura acompanha o status: entra ao marcar como lido, sai ao desmarcar
+            book.finished_date = date.today() if value == "read" else None
+        setattr(book, field, value)
 
     db.commit()
     db.refresh(book)
     return book
 
 
-@router.delete("/delete/{id}", status_code=204)
+@router.delete("/books/{id}", status_code=204)
+@router.delete("/delete/{id}", status_code=204, deprecated=True)
 def delete_book(id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     book = get_book_or_404(id, db, user)
 
     if book.is_example:
-        raise HTTPException(status_code=403, detail=EXAMPLE_LOCKED)
+        raise ApiError(403, "example_read_only", EXAMPLE_LOCKED)
 
     db.delete(book)
     db.commit()

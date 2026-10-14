@@ -87,14 +87,18 @@ tests/                  # pytest suite
 | PUT    | `/me/password`        | Change password; ends every other session and returns a new token |
 | POST   | `/me/photo`           | Upload a profile photo           |
 | DELETE | `/me`                 | Delete the account and all its books |
-| POST   | `/create`             | Add a new book                  |
+| POST   | `/books`              | Add a new book                  |
 | GET    | `/books`              | List your books                 |
 | GET    | `/books/{id}`         | Get one of your books            |
-| PUT    | `/update/{id}`        | Update a book (partial updates)  |
-| DELETE | `/delete/{id}`        | Delete a book                    |
+| PATCH / PUT | `/books/{id}`    | Update a book: only the fields sent change; `null` clears synopsis, rating, comment or cover |
+| DELETE | `/books/{id}`         | Delete a book                    |
 | GET/HEAD | `/ping`             | Health check; GET also reports `demo` and `signup` |
 
 Every endpoint except `/ping` and `/auth/*` requires `Authorization: Bearer <token>`. In the interactive docs at `/docs`, use **Authorize** with your email in the username field.
+
+The old book routes (`POST /create`, `PUT /update/{id}`, `DELETE /delete/{id}`) still work and are marked as deprecated in `/docs`.
+
+Errors always come as `{"detail": "<message>", "code": "<code>"}`. The `code` is stable (for example `book_not_found`, `example_read_only`, `invalid_credentials`, `validation_error`), so clients should branch on it instead of on the message.
 
 ---
 

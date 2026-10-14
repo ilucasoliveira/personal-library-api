@@ -7,12 +7,13 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from .config import BCRYPT_ROUNDS, JWT_EXPIRE_DAYS, JWT_SECRET
 from .database import get_db
+from .errors import ApiError
 from .models import User
 
 ALGORITHM = "HS256"
@@ -20,9 +21,10 @@ ALGORITHM = "HS256"
 # tokenUrl faz o botão "Authorize" do /docs funcionar com email e senha
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-INVALID_TOKEN = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Invalid or expired session.",
+INVALID_TOKEN = ApiError(
+    status.HTTP_401_UNAUTHORIZED,
+    "invalid_session",
+    "Invalid or expired session.",
     headers={"WWW-Authenticate": "Bearer"},
 )
 
