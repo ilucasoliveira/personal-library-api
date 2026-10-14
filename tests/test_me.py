@@ -100,3 +100,8 @@ def test_photo_upload_replaces_old_photo(client, auth, monkeypatch):
 
     deleted = [url for kind, url in calls if kind == "delete"]
     assert deleted == [first.replace("/object/public/", "/object/")]
+
+
+def test_me_shows_when_the_account_was_created(client, auth):
+    body = client.get("/me", headers=auth).json()
+    assert body["created_at"]

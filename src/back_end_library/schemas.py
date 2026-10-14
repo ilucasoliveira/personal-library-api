@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -76,6 +76,7 @@ class UserResponse(BaseModel):
     accent: Optional[str] = None
     language: str
     is_visitor: bool
+    created_at: Optional[datetime] = None
 
 
 class TokenResponse(BaseModel):
